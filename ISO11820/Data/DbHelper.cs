@@ -241,4 +241,14 @@ public class DbHelper
         }
         return results;
     }
+
+    public void DeleteTestMaster(string productId, string testId)
+    {
+        using var conn = CreateConnection();
+        using var cmd = new SqliteCommand(
+            "DELETE FROM testmaster WHERE productid = @pid AND testid = @tid", conn);
+        cmd.Parameters.AddWithValue("@pid", productId);
+        cmd.Parameters.AddWithValue("@tid", testId);
+        cmd.ExecuteNonQuery();
+    }
 }

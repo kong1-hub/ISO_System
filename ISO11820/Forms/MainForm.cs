@@ -255,6 +255,8 @@ public partial class MainForm : Form
         btnQuery.Click += (s, e) => RunQuery();
         var btnExport = new Button { Text = "导出CSV", Location = new Point(760, 10), Size = new Size(90, 30), BackColor = Color.FromArgb(40, 160, 80), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
         btnExport.Click += (s, e) => ExportQuery();
+        var btnDelete = new Button { Text = "删除", Location = new Point(860, 10), Size = new Size(60, 30), BackColor = Color.FromArgb(200, 60, 60), ForeColor = Color.White, FlatStyle = FlatStyle.Flat };
+        btnDelete.Click += (s, e) => DeleteRecord();
 
         topPanel.Controls.Add(dtpStart);
         topPanel.Controls.Add(dtpEnd);
@@ -262,17 +264,44 @@ public partial class MainForm : Form
         topPanel.Controls.Add(cmbQueryOperator);
         topPanel.Controls.Add(btnQuery);
         topPanel.Controls.Add(btnExport);
+        topPanel.Controls.Add(btnDelete);
 
         dgvRecords = new DataGridView
         {
             Dock = DockStyle.Fill,
             BackgroundColor = Color.FromArgb(30, 30, 30),
             ForeColor = Color.White,
-            GridColor = Color.Gray,
+            GridColor = Color.FromArgb(60, 60, 60),
             AllowUserToAddRows = false,
             ReadOnly = true,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
-            SelectionMode = DataGridViewSelectionMode.FullRowSelect
+            SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+            EnableHeadersVisualStyles = false,
+            ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+            {
+                BackColor = Color.FromArgb(50, 50, 50),
+                ForeColor = Color.FromArgb(200, 200, 200),
+                Font = new Font("Microsoft YaHei", 9, FontStyle.Bold)
+            },
+            RowHeadersDefaultCellStyle = new DataGridViewCellStyle
+            {
+                BackColor = Color.FromArgb(40, 40, 40),
+                ForeColor = Color.Gray
+            },
+            DefaultCellStyle = new DataGridViewCellStyle
+            {
+                BackColor = Color.FromArgb(35, 35, 35),
+                ForeColor = Color.FromArgb(220, 220, 220),
+                SelectionBackColor = Color.FromArgb(0, 100, 180),
+                SelectionForeColor = Color.White
+            },
+            AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle
+            {
+                BackColor = Color.FromArgb(42, 42, 42),
+                ForeColor = Color.FromArgb(220, 220, 220),
+                SelectionBackColor = Color.FromArgb(0, 100, 180),
+                SelectionForeColor = Color.White
+            }
         };
         // 详情面板（右侧常显示）
         var detailPanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(35, 35, 35), Padding = new Padding(10) };
@@ -373,6 +402,19 @@ public partial class MainForm : Form
                 sb.AppendLine(string.Join(",", row.Cells.Cast<DataGridViewCell>().Select(c => c.Value?.ToString() ?? "")));
             File.WriteAllText(sfd.FileName, sb.ToString(), System.Text.Encoding.UTF8);
             MessageBox.Show($"导出成功: {sfd.FileName}");
+        }
+    }
+
+    private void DeleteRecord()
+    {
+        if (dgvRecords.CurrentRow?.DataBoundItem == null) { MessageBox.Show("请先选中一条记录"); return; }
+        dynamic row = dgvRecords.CurrentRow.DataBoundItem;
+        string pid = (string)row.ProductId;
+        string tid = (string)row.TestId;
+        if (MessageBox.Show($"确定删除试验 {pid}/{tid}？", "确认删除", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+        {
+            _ctx.Db.DeleteTestMaster(pid, tid);
+            RunQuery();
         }
     }
 
