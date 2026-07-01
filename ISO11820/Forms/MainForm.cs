@@ -364,8 +364,7 @@ public partial class MainForm : Form
 
     private void OnDataBroadcast(object? sender, DataBroadcastEventArgs e)
     {
-        if (this.InvokeRequired) { this.Invoke(() => OnDataBroadcast(sender, e)); return; }
-
+        // WinForms Timer 在 UI 线程触发，无需 Invoke
         var temps = e.Temperatures;
         lblTF1Val.Text = $"{temps["TF1"]:F1} °C";
         lblTF2Val.Text = $"{temps["TF2"]:F1} °C";
@@ -412,7 +411,6 @@ public partial class MainForm : Form
 
     private void OnStateChanged(object? sender, string state)
     {
-        if (this.InvokeRequired) { this.Invoke(() => OnStateChanged(sender, state)); return; }
         lblStatus.Text = state switch { "Idle" => "空闲", "Preparing" => "升温中", "Ready" => "就绪", "Recording" => "记录中", "Complete" => "完成", _ => state };
         UpdateButtonStates();
     }
