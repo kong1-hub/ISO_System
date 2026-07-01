@@ -213,7 +213,7 @@ public class TestController
         CurrentTest.FlameStartTime = flameStartTime;
         CurrentTest.FlameDuration = flameDuration;
         CurrentTest.Remark = remark;
-        CurrentTest.TotalTestTime = _daqWorker.ElapsedSeconds;
+        // TotalTestTime 已在 StopRecording 中正确设置，此处不覆盖
         CurrentTest.Flag = "10000000";
 
         CurrentTest.DeltaTf1 = temps["TF1"] - envTemp;
