@@ -10,7 +10,7 @@ public class DaqWorker : IDisposable
     private Dictionary<string, double> _temperatures;
     private readonly List<double> _furnaceTempHistory = new();
     private readonly List<MasterMessage> _pendingMessages = new();
-    private double _accumulatedMs;
+    private DateTime _lastSecondTime = DateTime.Now;
 
     public event EventHandler<DataBroadcastEventArgs>? DataBroadcast;
     public event Action? SecondElapsed;
@@ -24,46 +24,64 @@ public class DaqWorker : IDisposable
         _simulator = simulator;
         _config = config;
         _temperatures = simulator.GetInitialTemperatures();
-        _timer = new System.Timers.Timer(800);
+        _timer = new System.Timers.Timer(200); // 200ms faster tick for smoother UI
         _timer.Elapsed += OnTick;
         _timer.AutoReset = true;
     }
 
-    public void Start() => _timer.Start();
+    public void Start()
+    {
+        _lastSecondTime = DateTime.Now;
+        _timer.Start();
+    }
+
     public void Stop() => _timer.Stop();
-    public void ResetElapsed() { ElapsedSeconds = 0; _accumulatedMs = 0; }
+    public void ResetElapsed()
+    {
+        ElapsedSeconds = 0;
+        _lastSecondTime = DateTime.Now;
+    }
 
     private void OnTick(object? sender, System.Timers.ElapsedEventArgs e)
     {
-        if (_config.EnableSimulation)
-            _temperatures = _simulator.Update(_temperatures, CurrentState);
-
-        _furnaceTempHistory.Add(_temperatures["TF1"]);
-        if (_furnaceTempHistory.Count > 600) _furnaceTempHistory.RemoveAt(0);
-
-        double drift = DriftCalculator.CalculateDrift(_furnaceTempHistory);
-
-        _accumulatedMs += 800;
-        if (_accumulatedMs >= 1000)
+        try
         {
-            _accumulatedMs -= 1000;
-            if (CurrentState == TestState.Recording)
-                ElapsedSeconds++;
-            SecondElapsed?.Invoke();
+            if (_config.EnableSimulation)
+                _temperatures = _simulator.Update(_temperatures, CurrentState);
+
+            _furnaceTempHistory.Add(_temperatures["TF1"]);
+            if (_furnaceTempHistory.Count > 600) _furnaceTempHistory.RemoveAt(0);
+
+            // DateTime-based second detection (more reliable than accumulated ms)
+            var now = DateTime.Now;
+            if ((now - _lastSecondTime).TotalSeconds >= 1.0)
+            {
+                _lastSecondTime = now;
+                if (CurrentState == TestState.Recording)
+                    ElapsedSeconds++;
+                SecondElapsed?.Invoke();
+            }
+
+            double drift = DriftCalculator.CalculateDrift(_furnaceTempHistory);
+
+            var args = new DataBroadcastEventArgs
+            {
+                Temperatures = new Dictionary<string, double>(_temperatures),
+                CurrentState = CurrentState.ToString(),
+                ElapsedSeconds = ElapsedSeconds,
+                IsStable = false,
+                Drift = drift,
+                Messages = new List<MasterMessage>(_pendingMessages)
+            };
+
+            DataBroadcast?.Invoke(this, args);
+            _pendingMessages.Clear();
         }
-
-        var args = new DataBroadcastEventArgs
+        catch (Exception ex)
         {
-            Temperatures = new Dictionary<string, double>(_temperatures),
-            CurrentState = CurrentState.ToString(),
-            ElapsedSeconds = ElapsedSeconds,
-            IsStable = false,
-            Drift = drift,
-            Messages = new List<MasterMessage>(_pendingMessages)
-        };
-
-        DataBroadcast?.Invoke(this, args);
-        _pendingMessages.Clear();
+            // Prevent silent timer death; log the error
+            System.Diagnostics.Debug.WriteLine($"DaqWorker.OnTick error: {ex.Message}");
+        }
     }
 
     public void AddMessage(string message)
