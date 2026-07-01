@@ -430,7 +430,7 @@ public partial class MainForm : Form
         btnNewTest.Enabled = s == TestState.Idle || (s == TestState.Preparing && !hasActive) || (s == TestState.Complete && !hasUnSaved);
         btnStartHeat.Enabled = s == TestState.Idle;
         btnStopHeat.Enabled = s == TestState.Preparing || s == TestState.Ready || s == TestState.Complete;
-        btnStartRecord.Enabled = s == TestState.Ready && !hasUnSaved;
+        btnStartRecord.Enabled = s == TestState.Ready && !hasUnSaved && _tc.CurrentTest != null;
         btnStopRecord.Enabled = s == TestState.Recording;
         btnTestRecord.Enabled = hasUnSaved;
         btnSettings.Enabled = s != TestState.Recording;

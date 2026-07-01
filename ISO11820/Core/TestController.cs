@@ -32,7 +32,8 @@ public class TestController
 
     public void DoWork()
     {
-        if (State == TestState.Idle || CurrentTest == null) return;
+        if (State == TestState.Idle) return;
+        // 允许无试验时预热炉子（状态机正常运行），但记录阶段必须有试验
 
         double tf1 = _daqWorker.Temperatures["TF1"];
         double maxDrift = _simConfig.MaxTemperatureDriftPerTenMinutes;
@@ -153,6 +154,7 @@ public class TestController
     public bool StartRecording()
     {
         if (State != TestState.Ready) return false;
+        if (CurrentTest == null) return false; // 必须先创建试验
 
         if (_pidOutputQueue.Count > 0 && CurrentTest != null)
             CurrentTest.ConstPower = _pidOutputQueue.Average();
