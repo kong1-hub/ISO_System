@@ -53,6 +53,8 @@ public partial class MainForm : Form
         WireEvents();
         ShowInitialTemperatures();
         UpdateButtonStates();
+        // 立即启动仿真器（Idle时温度保持不变，仅广播当前值用于UI显示）
+        _ctx.DaqWorker.Start();
     }
 
     private void ShowInitialTemperatures()

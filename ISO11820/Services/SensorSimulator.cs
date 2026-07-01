@@ -34,11 +34,7 @@ public class SensorSimulator
 
         if (state == TestState.Idle)
         {
-            result["TF1"] = Math.Max(25, tf1 - 0.5 + noise() * 0.1);
-            result["TF2"] = Math.Max(25, tf2 - 0.5 + noise() * 0.1);
-            result["TS"] = Math.Max(25, tf1 * 0.3 + noise());
-            result["TC"] = Math.Max(25, tf1 * 0.25 + noise());
-            result["TCal"] = Math.Max(25, tf1 + noise() * 2);
+            // Idle: 保持初始温度不变，不模拟降温（等用户操作）
             return result;
         }
 
