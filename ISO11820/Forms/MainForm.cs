@@ -288,7 +288,7 @@ public partial class MainForm : Form
         string? pid = string.IsNullOrWhiteSpace(txtQueryProduct.Text) ? null : txtQueryProduct.Text;
         string? op = cmbQueryOperator.SelectedIndex <= 0 ? null : cmbQueryOperator.SelectedItem?.ToString();
         string? sd = dtpStart.Value.ToString("yyyy-MM-dd");
-        string? ed = dtpEnd.Value.ToString("yyyy-MM-dd");
+        string? ed = dtpEnd.Value.AddDays(1).ToString("yyyy-MM-dd"); // +1天包含当天所有记录
         var records = _ctx.Db.QueryTestMasters(pid, op, sd, ed);
         dgvRecords.DataSource = records.Select(r => new {
             r.ProductId, r.TestId, r.TestDate, r.Operator,
