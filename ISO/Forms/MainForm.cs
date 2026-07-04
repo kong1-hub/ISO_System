@@ -494,56 +494,33 @@ public partial class MainForm : Form
         if (plotView.ActualModel == null) return;
 
         var model = plotView.ActualModel;
-        // 修正：减去图表区域偏移，得到 plot-area 内的坐标
-        double px = e.X - model.PlotArea.Left;
-        double py = e.Y - model.PlotArea.Top;
-
-        // 用轴直接反算数据坐标，再找最近点（不受 zoom/pan 影响）
-        double bestDist = double.MaxValue;
         string bestTip = "";
+        double bestDist = double.MaxValue;
 
         foreach (var series in model.Series.OfType<LineSeries>())
         {
             if (!series.IsVisible || series.Points.Count == 0) continue;
 
+            // 用 OxyPlot 内置 HitTest，屏幕坐标直接传入，内部自动转换
+            var hit = series.HitTest(new HitTestArguments(new ScreenPoint(e.X, e.Y), 12));
+            if (hit == null) continue;
+
+            int idx = (int)Math.Round(hit.Index);
+            if (idx < 0 || idx >= series.Points.Count) continue;
+
+            var pt = series.Points[idx];
+            // 用像素距离排序，找最近的曲线（Transform 返回 plot-area 内坐标，加 offset 对齐屏幕坐标）
             var xAxis = series.XAxis ?? model.DefaultXAxis;
             var yAxis = series.YAxis ?? model.DefaultYAxis;
             if (xAxis == null || yAxis == null) continue;
+            double sx = xAxis.Transform(pt.X) + model.PlotArea.Left;
+            double sy = yAxis.Transform(pt.Y) + model.PlotArea.Top;
+            double dist = (e.X - sx) * (e.X - sx) + (e.Y - sy) * (e.Y - sy);
 
-            // 屏幕坐标 → 数据坐标
-            double dataX = xAxis.InverseTransform(px);
-            double dataY = yAxis.InverseTransform(py);
-
-            // 在数据空间找最近点
-            double minDx = (xAxis.ActualMaximum - xAxis.ActualMinimum) / 400; // ~1.5s 容差
-            double minDy = (yAxis.ActualMaximum - yAxis.ActualMinimum) / 250; // ~3°C 容差
-            double bestIdxDist = double.MaxValue;
-
-            for (int i = 0; i < series.Points.Count; i++)
+            if (dist < bestDist)
             {
-                var pt = series.Points[i];
-                double ddx = (pt.X - dataX) / minDx;
-                double ddy = (pt.Y - dataY) / minDy;
-                double ndist = ddx * ddx + ddy * ddy;
-                if (ndist < bestIdxDist) bestIdxDist = ndist;
-            }
-
-            if (bestIdxDist < 1.0 && bestIdxDist < bestDist)
-            {
-                bestDist = bestIdxDist;
-                // 找到最近点后再查一次
-                for (int i = 0; i < series.Points.Count; i++)
-                {
-                    var pt = series.Points[i];
-                    double ddx = (pt.X - dataX) / minDx;
-                    double ddy = (pt.Y - dataY) / minDy;
-                    double ndist = ddx * ddx + ddy * ddy;
-                    if (Math.Abs(ndist - bestIdxDist) < 0.001)
-                    {
-                        bestTip = $"{series.Title}\n━━━━━━\n时间: {pt.X:F0} s\n温度: {pt.Y:F1} °C";
-                        break;
-                    }
-                }
+                bestDist = dist;
+                bestTip = $"{series.Title}\n━━━━━━\n时间: {pt.X:F0} s\n温度: {pt.Y:F1} °C";
             }
         }
 
