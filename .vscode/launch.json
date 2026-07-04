@@ -6,9 +6,9 @@
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
-            "program": "${workspaceFolder}/ISO-1.0v/bin/Debug/net8.0-windows/ISO11820.dll",
+            "program": "${workspaceFolder}/ISO-1.1v/bin/Debug/net8.0-windows/ISO11820.dll",
             "args": [],
-            "cwd": "${workspaceFolder}/ISO-1.0v",
+            "cwd": "${workspaceFolder}/ISO-1.1v",
             "stopAtEntry": false,
             "console": "internalConsole",
             "env": {
