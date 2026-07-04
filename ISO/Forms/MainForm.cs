@@ -53,12 +53,23 @@ public partial class MainForm : Form
 
     public MainForm()
     {
+        // 启用全窗体双缓冲，消除控件重绘导致的频闪
+        this.DoubleBuffered = true;
+        this.SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.AllPaintingInWmPaint, true);
+
         _tc = _ctx.TestController;
         InitializeComponent();
         SetupPlot();
         WireEvents();
         ShowInitialTemperatures();
         UpdateButtonStates();
+
+        // 切换到"记录查询"tab时自动加载数据
+        tabControl.SelectedIndexChanged += (s, e) =>
+        {
+            if (tabControl.SelectedTab == tabQuery)
+                RunQuery();
+        };
 
         this.Load += (s, e) =>
         {
@@ -206,6 +217,11 @@ public partial class MainForm : Form
         var colors = new[] { ThemeColors.TempFurnace1, ThemeColors.TempFurnace2, ThemeColors.TempSurface, ThemeColors.TempCenter, ThemeColors.TempCal };
         var lbls = new Label[5];
 
+        // 启用双缓冲防止布局面板重绘闪烁
+        typeof(TableLayoutPanel).InvokeMember("DoubleBuffered",
+            System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+            null, ledTable, new object[] { true });
+
         for (int i = 0; i < 5; i++)
         {
             var ledPanel = new Panel
@@ -215,6 +231,10 @@ public partial class MainForm : Form
                 BorderStyle = BorderStyle.FixedSingle,
                 Margin = new Padding(3)
             };
+            // 启用双缓冲防止温度数值更新时频闪
+            typeof(Panel).InvokeMember("DoubleBuffered",
+                System.Reflection.BindingFlags.SetProperty | System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                null, ledPanel, new object[] { true });
 
             var lblName = new Label
             {
@@ -575,83 +595,162 @@ public partial class MainForm : Form
 
     private void BuildQueryTab()
     {
-        var topPanel = new Panel { Dock = DockStyle.Top, Height = 50, BackColor = ThemeColors.BgLight };
+        // === 顶部标题栏 ===
+        var titleBar = new Panel { Dock = DockStyle.Top, Height = 36, BackColor = ThemeColors.BgMedium };
+        titleBar.Controls.Add(new Label
+        {
+            Text = "▌ 试验记录查询",
+            ForeColor = ThemeColors.TextPrimary,
+            Font = new Font("Microsoft YaHei", 11, FontStyle.Bold),
+            Location = new Point(12, 7),
+            Size = new Size(200, 24)
+        });
 
-        topPanel.Controls.Add(new Label { Text = "开始:", ForeColor = ThemeColors.TextPrimary, Location = new Point(10, 15), Size = new Size(40, 22) });
-        dtpStart = new DateTimePicker { Location = new Point(50, 12), Size = new Size(120, 24), Format = DateTimePickerFormat.Short };
-        topPanel.Controls.Add(new Label { Text = "结束:", ForeColor = ThemeColors.TextPrimary, Location = new Point(180, 15), Size = new Size(40, 22) });
-        dtpEnd = new DateTimePicker { Location = new Point(220, 12), Size = new Size(120, 24), Format = DateTimePickerFormat.Short };
-        topPanel.Controls.Add(new Label { Text = "样品:", ForeColor = ThemeColors.TextPrimary, Location = new Point(350, 15), Size = new Size(40, 22) });
-        txtQueryProduct = new TextBox { Location = new Point(390, 12), Size = new Size(100, 24) };
-        topPanel.Controls.Add(new Label { Text = "操作员:", ForeColor = ThemeColors.TextPrimary, Location = new Point(500, 15), Size = new Size(55, 22) });
-        cmbQueryOperator = new ComboBox { Location = new Point(555, 12), Size = new Size(100, 24), DropDownStyle = ComboBoxStyle.DropDownList };
+        // === 筛选栏 — 分组卡片式 ===
+        var filterBar = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = ThemeColors.BgDark, Padding = new Padding(8, 6, 8, 6) };
 
-        var btnQuery = MkSmallBtn("查询", ThemeColors.AccentBlue, new Point(670, 10), new Size(75, 30));
+        // 日期范围组
+        var lblDate = new Label { Text = "日期范围:", ForeColor = ThemeColors.TextMuted, Font = new Font("Microsoft YaHei", 9), Location = new Point(8, 18), Size = new Size(62, 22), TextAlign = ContentAlignment.MiddleRight };
+        dtpStart = new DateTimePicker { Location = new Point(72, 16), Size = new Size(115, 24), Format = DateTimePickerFormat.Short };
+        var lblSep = new Label { Text = "~", ForeColor = ThemeColors.TextMuted, Font = new Font("Microsoft YaHei", 9), Location = new Point(190, 18), Size = new Size(18, 22), TextAlign = ContentAlignment.MiddleCenter };
+        dtpEnd = new DateTimePicker { Location = new Point(210, 16), Size = new Size(115, 24), Format = DateTimePickerFormat.Short };
+
+        // 样品编号组
+        var lblProduct = new Label { Text = "样品编号:", ForeColor = ThemeColors.TextMuted, Font = new Font("Microsoft YaHei", 9), Location = new Point(340, 18), Size = new Size(62, 22), TextAlign = ContentAlignment.MiddleRight };
+        txtQueryProduct = new TextBox { Location = new Point(404, 16), Size = new Size(110, 24), Font = new Font("Microsoft YaHei", 9), BackColor = ThemeColors.BgInput, ForeColor = ThemeColors.TextPrimary, BorderStyle = BorderStyle.FixedSingle };
+
+        // 操作员组
+        var lblOp = new Label { Text = "操作员:", ForeColor = ThemeColors.TextMuted, Font = new Font("Microsoft YaHei", 9), Location = new Point(526, 18), Size = new Size(52, 22), TextAlign = ContentAlignment.MiddleRight };
+        cmbQueryOperator = new ComboBox { Location = new Point(580, 16), Size = new Size(100, 24), DropDownStyle = ComboBoxStyle.DropDownList, FlatStyle = FlatStyle.Flat, Font = new Font("Microsoft YaHei", 9) };
+
+        // 操作按钮组
+        var btnQuery = MkSmallBtn("🔍 查询", ThemeColors.AccentBlue, new Point(698, 12), new Size(88, 34));
         btnQuery.Click += (s, e) => RunQuery();
-        var btnExport = MkSmallBtn("导出Excel", ThemeColors.AccentGreen, new Point(755, 10), new Size(90, 30));
+        var btnExport = MkSmallBtn("📥 导出", ThemeColors.AccentGreen, new Point(794, 12), new Size(88, 34));
         btnExport.Click += (s, e) => ExportQuery();
-        var btnDelete = MkSmallBtn("删除", ThemeColors.AccentRed, new Point(855, 10), new Size(60, 30));
+        var btnDelete = MkSmallBtn("🗑 删除", ThemeColors.AccentRed, new Point(890, 12), new Size(75, 34));
         btnDelete.Click += (s, e) => DeleteRecord();
 
-        topPanel.Controls.Add(dtpStart);
-        topPanel.Controls.Add(dtpEnd);
-        topPanel.Controls.Add(txtQueryProduct);
-        topPanel.Controls.Add(cmbQueryOperator);
-        topPanel.Controls.Add(btnQuery);
-        topPanel.Controls.Add(btnExport);
-        topPanel.Controls.Add(btnDelete);
+        filterBar.Controls.Add(lblDate);
+        filterBar.Controls.Add(dtpStart);
+        filterBar.Controls.Add(lblSep);
+        filterBar.Controls.Add(dtpEnd);
+        filterBar.Controls.Add(lblProduct);
+        filterBar.Controls.Add(txtQueryProduct);
+        filterBar.Controls.Add(lblOp);
+        filterBar.Controls.Add(cmbQueryOperator);
+        filterBar.Controls.Add(btnQuery);
+        filterBar.Controls.Add(btnExport);
+        filterBar.Controls.Add(btnDelete);
 
+        // === 结果统计栏 ===
+        var lblResultCount = new Label
+        {
+            Text = "共 0 条记录",
+            ForeColor = ThemeColors.TextSecondary,
+            Font = new Font("Microsoft YaHei", 9, FontStyle.Bold),
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Padding = new Padding(8, 0, 0, 0)
+        };
+        var resultBar = new Panel { Dock = DockStyle.Top, Height = 28, BackColor = ThemeColors.BgLight };
+        resultBar.Controls.Add(lblResultCount);
+
+        // 记录 DataGridView 后，动态更新统计数
         dgvRecords = new DataGridView
         {
             Dock = DockStyle.Fill,
             BackgroundColor = ThemeColors.BgDark,
             ForeColor = ThemeColors.TextPrimary,
-            GridColor = ThemeColors.GridBorder,
+            GridColor = Color.FromArgb(230, 230, 230),
             AllowUserToAddRows = false,
             ReadOnly = true,
             AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
             SelectionMode = DataGridViewSelectionMode.FullRowSelect,
             EnableHeadersVisualStyles = false,
+            RowTemplate = { Height = 32 },
+            BorderStyle = BorderStyle.None,
+            CellBorderStyle = DataGridViewCellBorderStyle.SingleHorizontal,
+            ColumnHeadersBorderStyle = DataGridViewHeaderBorderStyle.Single,
+            ColumnHeadersHeight = 36,
+            ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing,
             ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = ThemeColors.GridHeader,
-                ForeColor = ThemeColors.TextSecondary,
-                Font = new Font("Microsoft YaHei", 9, FontStyle.Bold)
+                BackColor = Color.FromArgb(245, 245, 245),
+                ForeColor = Color.FromArgb(60, 60, 60),
+                Font = new Font("Microsoft YaHei", 9, FontStyle.Bold),
+                Alignment = DataGridViewContentAlignment.MiddleCenter,
+                Padding = new Padding(0, 0, 0, 0)
             },
             RowHeadersDefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = ThemeColors.BgLight,
-                ForeColor = ThemeColors.TextSecondary
+                BackColor = Color.FromArgb(245, 245, 245),
+                ForeColor = Color.FromArgb(140, 140, 140),
+                Font = new Font("Consolas", 8),
+                Alignment = DataGridViewContentAlignment.MiddleCenter
             },
             DefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = ThemeColors.GridBg,
-                ForeColor = ThemeColors.GridText,
-                SelectionBackColor = ThemeColors.GridSelBg,
-                SelectionForeColor = Color.White
+                BackColor = Color.White,
+                ForeColor = Color.FromArgb(40, 40, 40),
+                SelectionBackColor = Color.FromArgb(0, 120, 215),
+                SelectionForeColor = Color.White,
+                Font = new Font("Microsoft YaHei", 9),
+                Alignment = DataGridViewContentAlignment.MiddleCenter,
+                Padding = new Padding(4, 0, 4, 0)
             },
             AlternatingRowsDefaultCellStyle = new DataGridViewCellStyle
             {
-                BackColor = ThemeColors.GridAltBg,
-                ForeColor = ThemeColors.GridText,
-                SelectionBackColor = ThemeColors.GridSelBg,
-                SelectionForeColor = Color.White
+                BackColor = Color.FromArgb(250, 250, 252),
+                ForeColor = Color.FromArgb(40, 40, 40),
+                SelectionBackColor = Color.FromArgb(0, 120, 215),
+                SelectionForeColor = Color.White,
+                Font = new Font("Microsoft YaHei", 9),
+                Alignment = DataGridViewContentAlignment.MiddleCenter,
+                Padding = new Padding(4, 0, 4, 0)
             }
         };
+        dgvRecords.DataSourceChanged += (s, e) =>
+        {
+            lblResultCount.Text = $"共 {dgvRecords.RowCount} 条记录";
+        };
 
-        var detailPanel = new Panel { Dock = DockStyle.Fill, BackColor = ThemeColors.GridBg, Padding = new Padding(10) };
+        // === 详情面板 — 卡片式布局 ===
+        var detailPanel = new Panel { Dock = DockStyle.Fill, BackColor = ThemeColors.BgDark, Padding = new Padding(8) };
+
+        var detailCard = new Panel
+        {
+            Dock = DockStyle.Fill,
+            BackColor = ThemeColors.BgMedium,
+            BorderStyle = BorderStyle.FixedSingle,
+            Padding = new Padding(12)
+        };
+
+        var detailTitle = new Label
+        {
+            Text = "📋 试验详情",
+            ForeColor = ThemeColors.TextPrimary,
+            Font = new Font("Microsoft YaHei", 11, FontStyle.Bold),
+            Dock = DockStyle.Top,
+            Height = 30
+        };
+
         var txtDetail = new TextBox
         {
             Dock = DockStyle.Fill,
             Multiline = true,
             ReadOnly = true,
-            BackColor = ThemeColors.GridBg,
-            ForeColor = ThemeColors.TextSecondary,
+            BackColor = Color.White,
+            ForeColor = Color.FromArgb(50, 50, 50),
             Font = new Font("Microsoft YaHei", 10),
             BorderStyle = BorderStyle.None,
+            ScrollBars = ScrollBars.Vertical,
             Text = "← 选中一条记录查看详情"
         };
-        detailPanel.Controls.Add(txtDetail);
+
+        detailCard.Controls.Add(txtDetail);
+        detailCard.Controls.Add(detailTitle);
+        detailPanel.Controls.Add(detailCard);
 
         dgvRecords.SelectionChanged += (s, e) =>
         {
@@ -661,46 +760,57 @@ public partial class MainForm : Form
             if (tm != null)
             {
                 string verdict = (tm.DeltaTf <= 50 && tm.LostWeightPer <= 50 && tm.FlameDuration < 5)
-                    ? "通过 — 材料判定为不燃" : "不通过";
+                    ? "✅ 通过 — 材料判定为不燃" : "❌ 不通过";
+                string verdictColor = verdict.StartsWith("✅") ? "通过" : "不通过";
                 txtDetail.Text =
-                    $"样品编号: {tm.ProductId}\r\n" +
-                    $"试验标识: {tm.TestId}\r\n" +
-                    $"试验日期: {tm.TestDate}\r\n" +
-                    $"操作员: {tm.Operator}\r\n" +
-                    $"━━━━━━━━━━━━━━━━\r\n" +
-                    $"环境温度: {tm.EnvTemp:F1} °C\r\n" +
-                    $"环境湿度: {tm.EnvHumidity:F1} %\r\n" +
-                    $"━━━━━━━━━━━━━━━━\r\n" +
-                    $"试验前质量: {tm.PreWeight:F2} g\r\n" +
-                    $"试验后质量: {tm.PostWeight:F2} g\r\n" +
-                    $"失重量: {tm.LostWeight:F2} g\r\n" +
-                    $"失重率: {tm.LostWeightPer:F2} %\r\n" +
-                    $"━━━━━━━━━━━━━━━━\r\n" +
-                    $"炉温1 温升: {tm.DeltaTf1:F1} °C\r\n" +
-                    $"炉温2 温升: {tm.DeltaTf2:F1} °C\r\n" +
-                    $"表面温升: {tm.DeltaTs:F1} °C\r\n" +
-                    $"中心温升: {tm.DeltaTc:F1} °C\r\n" +
-                    $"综合温升: {tm.DeltaTf:F1} °C\r\n" +
-                    $"━━━━━━━━━━━━━━━━\r\n" +
-                    $"火焰持续: {tm.FlameDuration} 秒\r\n" +
-                    $"试验时长: {tm.TotalTestTime} 秒\r\n" +
-                    $"备注: {tm.Remark}\r\n" +
-                    $"━━━━━━━━━━━━━━━━\r\n" +
-                    $"判定结论: {verdict}";
+                    $"═══════════════════════════════\r\n" +
+                    $"  样品编号     {tm.ProductId}\r\n" +
+                    $"  试验标识     {tm.TestId}\r\n" +
+                    $"  试验日期     {tm.TestDate}\r\n" +
+                    $"  操 作 员     {tm.Operator}\r\n" +
+                    $"═══════════════════════════════\r\n" +
+                    $"  环境温度     {tm.EnvTemp:F1} °C\r\n" +
+                    $"  环境湿度     {tm.EnvHumidity:F1} %\r\n" +
+                    $"═══════════════════════════════\r\n" +
+                    $"  试验前质量   {tm.PreWeight:F2} g\r\n" +
+                    $"  试验后质量   {tm.PostWeight:F2} g\r\n" +
+                    $"  失 重 量     {tm.LostWeight:F2} g\r\n" +
+                    $"  失 重 率     {tm.LostWeightPer:F2} %\r\n" +
+                    $"═══════════════════════════════\r\n" +
+                    $"  炉温1 温升   {tm.DeltaTf1:F1} °C\r\n" +
+                    $"  炉温2 温升   {tm.DeltaTf2:F1} °C\r\n" +
+                    $"  表面温升     {tm.DeltaTs:F1} °C\r\n" +
+                    $"  中心温升     {tm.DeltaTc:F1} °C\r\n" +
+                    $"  综合温升     {tm.DeltaTf:F1} °C\r\n" +
+                    $"═══════════════════════════════\r\n" +
+                    $"  火焰持续     {tm.FlameDuration} 秒\r\n" +
+                    $"  试验时长     {tm.TotalTestTime} 秒\r\n" +
+                    $"  备注信息     {tm.Remark}\r\n" +
+                    $"═══════════════════════════════\r\n" +
+                    $"  判定结论  ▶  {verdict}";
             }
         };
 
+        // === 左右分割布局 ===
         var splitQuery = new SplitContainer
         {
             Dock = DockStyle.Fill,
             Orientation = Orientation.Vertical,
-            SplitterDistance = 550
+            SplitterDistance = 580,
+            SplitterWidth = 4,
+            BackColor = Color.FromArgb(220, 220, 220)
         };
-        splitQuery.Panel1.Controls.Add(dgvRecords);
+
+        var leftPanel = new Panel { Dock = DockStyle.Fill };
+        leftPanel.Controls.Add(dgvRecords);
+        leftPanel.Controls.Add(resultBar);
+
+        splitQuery.Panel1.Controls.Add(leftPanel);
         splitQuery.Panel2.Controls.Add(detailPanel);
 
         tabQuery.Controls.Add(splitQuery);
-        tabQuery.Controls.Add(topPanel);
+        tabQuery.Controls.Add(filterBar);
+        tabQuery.Controls.Add(titleBar);
 
         var ops = _ctx.Db.GetAllOperators();
         cmbQueryOperator.Items.Add("全部");
@@ -843,7 +953,8 @@ public partial class MainForm : Form
     {
         var temps = e.Temperatures;
 
-        // 即时刷新温度显示
+        // 批量更新温度标签，减少重绘次数
+        this.SuspendLayout();
         lblTF1Val.Text = $"{temps["TF1"]:F1} °C";
         lblTF2Val.Text = $"{temps["TF2"]:F1} °C";
         lblTSVal.Text = $"{temps["TS"]:F1} °C";
@@ -888,6 +999,8 @@ public partial class MainForm : Form
         _tickCounter++;
         bool fullRefresh = axisChanged || (_tickCounter % 60 == 0);
         plotModel.InvalidatePlot(fullRefresh);
+
+        this.ResumeLayout(false);
 
         // 日志消息
         foreach (var msg in e.Messages)
@@ -961,20 +1074,40 @@ public partial class MainForm : Form
             _tc.SaveTestRecord(dlg.PostWeight, dlg.HasFlame ? 1 : 0, dlg.FlameStartTime, dlg.FlameDuration, dlg.Remark);
             var tm = _tc.CurrentTest;
             var tempData = _tc.TemperatureHistory;
+
+            var exportErrors = new List<string>();
             try
             {
                 _ctx.ExportService.ExportCsv(tm, tempData);
-                _ctx.ExportService.ExportExcel(tm, tempData);
-                if (bool.TryParse(_ctx.Configuration["Report:EnablePdfExport"], out bool enablePdf) && enablePdf)
-                    _ctx.ExportService.ExportPdf(tm, tempData);
-                MessageBox.Show("试验记录已保存，报告已生成。", "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
-            catch (Exception ex)
+            catch (Exception ex) { exportErrors.Add($"CSV: {ex.Message}"); }
+
+            try
             {
-                MessageBox.Show($"导出报告失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _ctx.ExportService.ExportExcel(tm, tempData);
             }
-            _tc.ClearCurrentTest();
+            catch (Exception ex) { exportErrors.Add($"Excel: {ex.Message}"); }
+
+            if (bool.TryParse(_ctx.Configuration["Report:EnablePdfExport"], out bool enablePdf) && enablePdf)
+            {
+                try
+                {
+                    _ctx.ExportService.ExportPdf(tm, tempData);
+                }
+                catch (Exception ex) { exportErrors.Add($"PDF: {ex.Message}"); }
+            }
+
+            if (exportErrors.Count > 0)
+                MessageBox.Show($"试验记录已保存，但以下报告导出失败:\n\n{string.Join("\n", exportErrors)}",
+                    "部分成功", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            else
+                MessageBox.Show("试验记录已保存，报告已生成。", "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            _tc.PrepareForNextRecording();
             UpdateButtonStates();
+            // 保存后刷新查询结果（若当前在查询tab则自动刷新）
+            if (tabControl.SelectedTab == tabQuery)
+                RunQuery();
         }
     }
 
