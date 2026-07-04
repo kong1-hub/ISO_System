@@ -6,6 +6,7 @@ using OxyPlot;
 using OxyPlot.Series;
 using OxyPlot.WindowsForms;
 using OxyPlot.Axes;
+using Serilog;
 using AppContext = ISO11820.Global.AppContext;
 
 namespace ISO11820.Forms;
@@ -967,26 +968,63 @@ public partial class MainForm : Form
         using var dlg = new TestRecordForm(_tc.CurrentTest);
         if (dlg.ShowDialog() == DialogResult.OK)
         {
+            // 1. 保存试验记录到数据库（核心操作）
             try
             {
                 _tc.SaveTestRecord(dlg.PostWeight, dlg.HasFlame ? 1 : 0, dlg.FlameStartTime, dlg.FlameDuration, dlg.Remark);
-                var tm = _tc.CurrentTest;
-                var tempData = _tc.TemperatureHistory;
-                // 温度数据写入数据库
-                _ctx.Db.InsertTemperatureData(tm.ProductId, tm.TestId, tempData);
-                _ctx.ExportService.ExportCsv(tm, tempData);
-                _ctx.ExportService.ExportExcel(tm, tempData);
-                if (bool.TryParse(_ctx.Configuration["Report:EnablePdfExport"], out bool enablePdf) && enablePdf)
-                    _ctx.ExportService.ExportPdf(tm, tempData);
-                MessageBox.Show("试验记录已保存，报告已生成。", "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                // 自动刷新查询并跳转
-                RunQuery();
-                tabControl.SelectedTab = tabQuery;
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"保存失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"数据库保存失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                _tc.ClearCurrentTest();
+                UpdateButtonStates();
+                return;
             }
+
+            var tm = _tc.CurrentTest;
+            var tempData = _tc.TemperatureHistory;
+
+            // 2. 保存温度数据到数据库
+            try
+            {
+                if (tempData.Count > 0)
+                    _ctx.Db.InsertTemperatureData(tm.ProductId, tm.TestId, tempData);
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "温度数据保存失败: {ProductId}/{TestId}", tm.ProductId, tm.TestId);
+            }
+
+            // 3. 导出文件（每个导出独立，互不影响）
+            var exportErrors = new List<string>();
+            try { _ctx.ExportService.ExportCsv(tm, tempData); }
+            catch (Exception ex) { exportErrors.Add($"CSV: {ex.Message}"); Log.Warning(ex, "CSV导出失败"); }
+
+            try { _ctx.ExportService.ExportExcel(tm, tempData); }
+            catch (Exception ex) { exportErrors.Add($"Excel: {ex.Message}"); Log.Warning(ex, "Excel导出失败"); }
+
+            if (bool.TryParse(_ctx.Configuration["Report:EnablePdfExport"], out bool enablePdf) && enablePdf)
+            {
+                try { _ctx.ExportService.ExportPdf(tm, tempData); }
+                catch (Exception ex) { exportErrors.Add($"PDF: {ex.Message}"); Log.Warning(ex, "PDF导出失败"); }
+            }
+
+            // 4. 显示结果
+            if (exportErrors.Count > 0)
+            {
+                MessageBox.Show(
+                    $"试验记录已保存。\n\n以下报告生成失败:\n• {string.Join("\n• ", exportErrors)}",
+                    "部分完成", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            else
+            {
+                MessageBox.Show("试验记录已保存，报告已生成。", "完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+
+            // 5. 自动刷新查询并跳转
+            RunQuery();
+            tabControl.SelectedTab = tabQuery;
+
             _tc.ClearCurrentTest();
             UpdateButtonStates();
         }

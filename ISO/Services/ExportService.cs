@@ -20,9 +20,17 @@ public class ExportService
         ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
     }
 
-    private string BaseDir => _config["FileStorage:BaseDirectory"] ?? "D:\\ISO11820";
-    private string TestDataDir => _config["FileStorage:TestDataDirectory"] ?? "D:\\ISO11820\\TestData";
-    private string ReportDir => _config["Report:OutputDirectory"] ?? "D:\\ISO11820\\Reports";
+    private static string AppBaseDir => AppDomain.CurrentDomain.BaseDirectory;
+    private string BaseDir => ResolvePath(_config["FileStorage:BaseDirectory"], "Data\\ISO11820");
+    private string TestDataDir => ResolvePath(_config["FileStorage:TestDataDirectory"], "Data\\ISO11820\\TestData");
+    private string ReportDir => ResolvePath(_config["Report:OutputDirectory"], "Data\\ISO11820\\Reports");
+
+    /// <summary>将配置中的相对路径解析为基于应用程序目录的绝对路径</summary>
+    private static string ResolvePath(string? configured, string fallback)
+    {
+        string path = configured ?? fallback;
+        return Path.IsPathRooted(path) ? path : Path.Combine(AppBaseDir, path);
+    }
 
     public string ExportCsv(TestMaster tm, List<TemperatureData> tempData)
     {

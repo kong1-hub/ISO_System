@@ -245,11 +245,32 @@ public class DbHelper
     public void DeleteTestMaster(string productId, string testId)
     {
         using var conn = CreateConnection();
-        using var cmd = new SqliteCommand(
-            "DELETE FROM testmaster WHERE productid = @pid AND testid = @tid", conn);
-        cmd.Parameters.AddWithValue("@pid", productId);
-        cmd.Parameters.AddWithValue("@tid", testId);
-        cmd.ExecuteNonQuery();
+        using var txn = conn.BeginTransaction();
+        try
+        {
+            // 先删除子表 temperaturedata 中的关联记录（外键约束）
+            using (var cmdTemp = new SqliteCommand(
+                "DELETE FROM temperaturedata WHERE productid = @pid AND testid = @tid", conn, txn))
+            {
+                cmdTemp.Parameters.AddWithValue("@pid", productId);
+                cmdTemp.Parameters.AddWithValue("@tid", testId);
+                cmdTemp.ExecuteNonQuery();
+            }
+            // 再删除主表 testmaster 记录
+            using (var cmdMaster = new SqliteCommand(
+                "DELETE FROM testmaster WHERE productid = @pid AND testid = @tid", conn, txn))
+            {
+                cmdMaster.Parameters.AddWithValue("@pid", productId);
+                cmdMaster.Parameters.AddWithValue("@tid", testId);
+                cmdMaster.ExecuteNonQuery();
+            }
+            txn.Commit();
+        }
+        catch
+        {
+            txn.Rollback();
+            throw;
+        }
     }
 
     /// <summary>批量插入温度数据（每条记录一秒）</summary>
