@@ -12,7 +12,9 @@
       "Bash(git ls-tree *)",
       "Bash(kill %1)",
       "Bash(echo \"exit: $?\")",
-      "Bash(powershell -Command \"Stop-Process -Name 'ISO11820' -Force -ErrorAction SilentlyContinue; Stop-Process -Name 'dotnet' -Force -ErrorAction SilentlyContinue; Write-Host 'done'\")"
+      "Bash(powershell -Command \"Stop-Process -Name 'ISO11820' -Force -ErrorAction SilentlyContinue; Stop-Process -Name 'dotnet' -Force -ErrorAction SilentlyContinue; Write-Host 'done'\")",
+      "Bash(git branch *)",
+      "Bash(git push *)"
     ],
     "additionalDirectories": [
       "d:\\Github\\ISO_System\\ISO"
