@@ -1975,24 +1975,27 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\28442\\.nuget\\packages\\": {}
+    "C:\\Users\\赖坤明\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\Github\\ISO_System\\ISO-1.0v\\ISO11820.csproj",
+      "projectUniqueName": "C:\\Users\\赖坤明\\Desktop\\Q-Y06\\ISO_System\\ISO-1.0v\\ISO11820.csproj",
       "projectName": "ISO11820",
-      "projectPath": "D:\\Github\\ISO_System\\ISO-1.0v\\ISO11820.csproj",
-      "packagesPath": "C:\\Users\\28442\\.nuget\\packages\\",
-      "outputPath": "D:\\Github\\ISO_System\\ISO-1.0v\\obj\\",
+      "projectPath": "C:\\Users\\赖坤明\\Desktop\\Q-Y06\\ISO_System\\ISO-1.0v\\ISO11820.csproj",
+      "packagesPath": "C:\\Users\\赖坤明\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\赖坤明\\Desktop\\Q-Y06\\ISO_System\\ISO-1.0v\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\28442\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\赖坤明\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
         "net8.0-windows"
       ],
       "sources": {
+        "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
+        "C:\\Program Files\\dotnet\\library-packs": {},
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
@@ -2076,7 +2079,7 @@
             "privateAssets": "none"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.422/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.400/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

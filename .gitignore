@@ -22,5 +22,11 @@ ISO-1.0v/Data/ISO11820/
 *.swp
 *.sln.docstates
 
+# Archived / merged
+ISO11820/
+
+# Docs (removed from repo)
 DB-数据库设计.md
 ISO11820-开发文档.md
+
+Report
