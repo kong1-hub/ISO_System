@@ -40,9 +40,12 @@ public sealed class AppContext
         TestController = new TestController(Db, DaqWorker, SimulationConfig);
         ExportService = new ExportService(Configuration);
 
-        string baseDir = Configuration["FileStorage:BaseDirectory"] ?? "D:\\ISO11820";
-        string testDataDir = Configuration["FileStorage:TestDataDirectory"] ?? "D:\\ISO11820\\TestData";
-        string reportDir = Configuration["Report:OutputDirectory"] ?? "D:\\ISO11820\\Reports";
+        string baseDir = Path.GetFullPath(Configuration["FileStorage:BaseDirectory"] ?? "Data\\ISO11820",
+            AppDomain.CurrentDomain.BaseDirectory);
+        string testDataDir = Path.GetFullPath(Configuration["FileStorage:TestDataDirectory"] ?? "Data\\ISO11820\\TestData",
+            AppDomain.CurrentDomain.BaseDirectory);
+        string reportDir = Path.GetFullPath(Configuration["Report:OutputDirectory"] ?? "Data\\ISO11820\\Reports",
+            AppDomain.CurrentDomain.BaseDirectory);
         Directory.CreateDirectory(baseDir);
         Directory.CreateDirectory(testDataDir);
         Directory.CreateDirectory(reportDir);
