@@ -928,7 +928,7 @@ public partial class MainForm : Form
         bool hasUnSaved = _tc.HasUnSavedCompleteTest();
         bool hasActive = _tc.CurrentTest != null;
 
-        btnNewTest.Enabled = s == TestState.Idle || (s == TestState.Preparing && !hasActive) || (s == TestState.Complete && !hasUnSaved);
+        btnNewTest.Enabled = s == TestState.Idle || s == TestState.Preparing || (s == TestState.Complete && !hasUnSaved);
         btnStartHeat.Enabled = s == TestState.Idle;
         btnStopHeat.Enabled = s == TestState.Preparing || s == TestState.Ready || s == TestState.Complete;
         btnStartRecord.Enabled = s == TestState.Ready && !hasUnSaved && _tc.CurrentTest != null;
@@ -975,7 +975,7 @@ public partial class MainForm : Form
             {
                 MessageBox.Show($"导出报告失败: {ex.Message}", "错误", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            _tc.ClearCurrentTest();
+            _tc.PrepareForNextRecording();
             UpdateButtonStates();
         }
     }
