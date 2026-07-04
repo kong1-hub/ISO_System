@@ -11,7 +11,8 @@
       "Bash(mkdir -p d:/Github/ISO_System/ISO/Helpers 2>/dev/null; echo \"done\")",
       "Bash(git ls-tree *)",
       "Bash(kill %1)",
-      "Bash(echo \"exit: $?\")"
+      "Bash(echo \"exit: $?\")",
+      "Bash(powershell -Command \"Stop-Process -Name 'ISO11820' -Force -ErrorAction SilentlyContinue; Stop-Process -Name 'dotnet' -Force -ErrorAction SilentlyContinue; Write-Host 'done'\")"
     ],
     "additionalDirectories": [
       "d:\\Github\\ISO_System\\ISO"

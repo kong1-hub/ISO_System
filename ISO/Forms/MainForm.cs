@@ -28,7 +28,9 @@ public partial class MainForm : Form
     private PlotModel plotModel = null!;
     private LineSeries seriesTF1 = null!, seriesTF2 = null!, seriesTS = null!, seriesTC = null!;
     private readonly ToolTip _chartTooltip = new();
-    private LineSeries? _hoveredSeries;
+
+    // Curve visibility checkboxes
+    private CheckBox cbTF1 = null!, cbTF2 = null!, cbTS = null!, cbTC = null!;
 
     // Log
     private RichTextBox rtbLog = null!;
@@ -116,8 +118,15 @@ public partial class MainForm : Form
         topTable.Controls.Add(statusPanel, 1, 0);
         topTable.Controls.Add(buttonPanel, 2, 0);
 
+        // === 图表 + 左侧曲线开关 ===
         plotView = new PlotView { Dock = DockStyle.Fill, BackColor = Color.White };
+        var legendPanel = CreateCurveLegendPanel();
 
+        var chartPanel = new Panel { Dock = DockStyle.Fill };
+        chartPanel.Controls.Add(plotView);
+        chartPanel.Controls.Add(legendPanel);
+
+        // === 日志 ===
         rtbLog = new RichTextBox
         {
             Dock = DockStyle.Fill,
@@ -150,7 +159,7 @@ public partial class MainForm : Form
             Orientation = Orientation.Horizontal,
             SplitterDistance = 320
         };
-        splitCenter.Panel1.Controls.Add(plotView);
+        splitCenter.Panel1.Controls.Add(chartPanel);
         splitCenter.Panel2.Controls.Add(rtbLog);
         splitCenter.Panel2.Controls.Add(logTitlePanel);
 
@@ -343,15 +352,64 @@ public partial class MainForm : Form
             Cursor = Cursors.Hand
         };
         btn.FlatAppearance.BorderSize = 1;
-        btn.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 80);
+        btn.FlatAppearance.BorderColor = ControlPaint.Dark(backColor, 0.2f);
         btn.FlatAppearance.MouseOverBackColor = ControlPaint.Light(backColor, 0.15f);
         btn.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(backColor, 0.25f);
         return btn;
     }
 
+    /// <summary>曲线开关面板 — 图表左侧</summary>
+    private Panel CreateCurveLegendPanel()
+    {
+        var panel = new Panel
+        {
+            Dock = DockStyle.Left,
+            Width = 110,
+            BackColor = Color.FromArgb(248, 248, 248),
+            Padding = new Padding(6, 8, 6, 8)
+        };
+
+        var lblTitle = new Label
+        {
+            Text = "曲线开关",
+            Font = new Font("Microsoft YaHei", 9, FontStyle.Bold),
+            ForeColor = ThemeColors.TextSecondary,
+            Location = new Point(6, 4),
+            Size = new Size(95, 20)
+        };
+
+        cbTF1 = MkCurveCb("炉温1", ThemeColors.TempFurnace1, 28);
+        cbTF2 = MkCurveCb("炉温2", ThemeColors.TempFurnace2, 52);
+        cbTS  = MkCurveCb("表面温", ThemeColors.TempSurface, 76);
+        cbTC  = MkCurveCb("中心温", ThemeColors.TempCenter, 100);
+
+        panel.Controls.Add(lblTitle);
+        panel.Controls.Add(cbTF1);
+        panel.Controls.Add(cbTF2);
+        panel.Controls.Add(cbTS);
+        panel.Controls.Add(cbTC);
+        return panel;
+    }
+
+    private CheckBox MkCurveCb(string text, Color color, int y)
+    {
+        var cb = new CheckBox
+        {
+            Text = text,
+            ForeColor = color,
+            Font = new Font("Microsoft YaHei", 9, FontStyle.Bold),
+            Location = new Point(8, y),
+            Size = new Size(95, 20),
+            Checked = true,
+            FlatStyle = FlatStyle.Flat,
+            Cursor = Cursors.Hand
+        };
+        return cb;
+    }
+
     #endregion
 
-    #region Plot (交互式曲线 + 悬停放大 + 图例)
+    #region Plot (可拖拽缩放 + 悬停 ToolTip + 左侧曲线开关)
 
     private void SetupPlot()
     {
@@ -360,7 +418,7 @@ public partial class MainForm : Form
             Title = "温度曲线",
             TextColor = OxyColors.Black,
             PlotAreaBorderColor = OxyColors.Gray,
-            IsLegendVisible = true
+            IsLegendVisible = false  // 用左侧自定义开关代替
         };
 
         // X 轴（虚线网格）
@@ -397,10 +455,10 @@ public partial class MainForm : Form
             MinorGridlineColor = OxyColor.FromRgb(230, 230, 230)
         });
 
-        seriesTF1 = MkSeries("炉温1", OxyColors.Red);
-        seriesTF2 = MkSeries("炉温2", OxyColors.Orange);
-        seriesTS  = MkSeries("表面温", OxyColors.LimeGreen);
-        seriesTC  = MkSeries("中心温", OxyColors.SkyBlue);
+        seriesTF1 = new LineSeries { Title = "炉温1", Color = OxyColors.Red, StrokeThickness = 2, MarkerType = MarkerType.None };
+        seriesTF2 = new LineSeries { Title = "炉温2", Color = OxyColors.Orange, StrokeThickness = 2, MarkerType = MarkerType.None };
+        seriesTS  = new LineSeries { Title = "表面温", Color = OxyColors.LimeGreen, StrokeThickness = 2, MarkerType = MarkerType.None };
+        seriesTC  = new LineSeries { Title = "中心温", Color = OxyColors.SkyBlue, StrokeThickness = 2, MarkerType = MarkerType.None };
 
         plotModel.Series.Add(seriesTF1);
         plotModel.Series.Add(seriesTF2);
@@ -409,28 +467,25 @@ public partial class MainForm : Form
 
         plotView.Model = plotModel;
 
-        // === 交互式悬停 ===
+        // === 可拖拽 + 滚轮缩放 ===
+        var controller = new PlotController();
+        controller.UnbindAll();
+        controller.BindMouseDown(OxyMouseButton.Left, PlotCommands.PanAt);
+        controller.BindMouseDown(OxyMouseButton.Right, PlotCommands.ZoomRectangle);
+        controller.Bind(new OxyMouseWheelGesture(), PlotCommands.ZoomWheel);
+        plotView.Controller = controller;
+
+        // === 悬停 ToolTip（只显示提示，不修改曲线，不干扰拖拽） ===
         plotView.MouseMove += PlotView_MouseMove;
-        plotView.MouseLeave += (s, e) =>
-        {
-            _chartTooltip.RemoveAll();
-            _chartTooltip.Active = false;
-            HoverSeries(null);
-        };
+        plotView.MouseLeave += (s, e) => { _chartTooltip.RemoveAll(); _chartTooltip.Active = false; };
+
+        // === 左侧复选框：控制曲线显隐 ===
+        cbTF1.CheckedChanged += (s, e) => seriesTF1.IsVisible = cbTF1.Checked;
+        cbTF2.CheckedChanged += (s, e) => seriesTF2.IsVisible = cbTF2.Checked;
+        cbTS.CheckedChanged  += (s, e) => seriesTS.IsVisible = cbTS.Checked;
+        cbTC.CheckedChanged  += (s, e) => seriesTC.IsVisible = cbTC.Checked;
     }
 
-    private static LineSeries MkSeries(string title, OxyColor color)
-    {
-        return new LineSeries
-        {
-            Title = title,
-            Color = color,
-            StrokeThickness = 2,
-            MarkerType = MarkerType.None
-        };
-    }
-
-    /// <summary>鼠标悬停：高亮曲线 + 显示 ToolTip</summary>
     private void PlotView_MouseMove(object? sender, MouseEventArgs e)
     {
         if (plotView.ActualModel == null) return;
@@ -441,7 +496,7 @@ public partial class MainForm : Form
 
         foreach (var series in plotView.ActualModel.Series.OfType<LineSeries>())
         {
-            if (series.Points.Count == 0) continue;
+            if (!series.IsVisible || series.Points.Count == 0) continue;
             var hit = series.GetNearestPoint(sp, false);
             if (hit == null) continue;
 
@@ -459,35 +514,14 @@ public partial class MainForm : Form
         if (best != null)
         {
             var dp = best.DataPoint;
-            string tip = $"{best.Series!.Title}\n━━━━━━━━━━\n时间: {dp.X:F0} s\n温度: {dp.Y:F1} °C";
-            _chartTooltip.SetToolTip(plotView, tip);
+            _chartTooltip.SetToolTip(plotView, $"{best.Series!.Title}\n━━━━━━\n时间: {dp.X:F0} s\n温度: {dp.Y:F1} °C");
             _chartTooltip.Active = true;
-            HoverSeries(best.Series as LineSeries);
         }
         else
         {
             _chartTooltip.RemoveAll();
             _chartTooltip.Active = false;
-            HoverSeries(null);
         }
-    }
-
-    /// <summary>悬停曲线放大（StrokeThickness 3.5），其余恢复</summary>
-    private void HoverSeries(LineSeries? target)
-    {
-        if (_hoveredSeries == target) return;
-
-        // 恢复旧曲线
-        if (_hoveredSeries != null)
-            _hoveredSeries.StrokeThickness = 2;
-
-        _hoveredSeries = target;
-
-        // 放大新曲线
-        if (_hoveredSeries != null)
-            _hoveredSeries.StrokeThickness = 3.5;
-
-        plotModel.InvalidatePlot(false);
     }
 
     private void ClearChart()
@@ -654,7 +688,7 @@ public partial class MainForm : Form
             Cursor = Cursors.Hand
         };
         btn.FlatAppearance.BorderSize = 1;
-        btn.FlatAppearance.BorderColor = Color.FromArgb(80, 80, 80);
+        btn.FlatAppearance.BorderColor = ControlPaint.Dark(backColor, 0.2f);
         btn.FlatAppearance.MouseOverBackColor = ControlPaint.Light(backColor, 0.15f);
         btn.FlatAppearance.MouseDownBackColor = ControlPaint.Dark(backColor, 0.25f);
         return btn;
@@ -774,6 +808,8 @@ public partial class MainForm : Form
     private void OnDataBroadcast(object? sender, DataBroadcastEventArgs e)
     {
         var temps = e.Temperatures;
+
+        // 即时刷新温度显示
         lblTF1Val.Text = $"{temps["TF1"]:F1} °C";
         lblTF2Val.Text = $"{temps["TF2"]:F1} °C";
         lblTSVal.Text = $"{temps["TS"]:F1} °C";
@@ -796,6 +832,7 @@ public partial class MainForm : Form
         if (!double.IsNaN(e.Drift)) lblDrift.Text = $"温漂: {e.Drift:F2} °C/10min";
         if (_tc.CurrentTest != null) lblSample.Text = $"样品: {_tc.CurrentTest.ProductId}";
 
+        // 更新曲线数据
         double t = _tc.State == TestState.Recording ? e.ElapsedSeconds : seriesTF1.Points.Count + 1;
         seriesTF1.Points.Add(new DataPoint(t, temps["TF1"]));
         seriesTF2.Points.Add(new DataPoint(t, temps["TF2"]));
@@ -813,6 +850,7 @@ public partial class MainForm : Form
 
         plotModel.InvalidatePlot(true);
 
+        // 日志消息
         foreach (var msg in e.Messages)
         {
             Color color = msg.Message.Contains("终止") ? Color.OrangeRed :
