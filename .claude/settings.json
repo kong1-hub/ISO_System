@@ -5,7 +5,9 @@
       "Bash(cat .vscode/tasks.json)",
       "Bash(cat ISO-1.1v/.vscode/tasks.json)",
       "Bash(timeout 5 dotnet run)",
-      "Bash(echo \"Exit: $?\")"
+      "Bash(echo \"Exit: $?\")",
+      "Bash(git checkout *)",
+      "Bash(git commit *)"
     ]
   }
 }
