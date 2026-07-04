@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/ISO-1.1v/ISO11820.csproj",
+                "${workspaceFolder}/ISO/ISO11820.csproj",
                 "--configuration", "Debug",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary"

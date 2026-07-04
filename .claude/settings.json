@@ -7,7 +7,14 @@
       "Bash(timeout 5 dotnet run)",
       "Bash(echo \"Exit: $?\")",
       "Bash(git checkout *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(mkdir -p d:/Github/ISO_System/ISO/Helpers 2>/dev/null; echo \"done\")",
+      "Bash(git ls-tree *)",
+      "Bash(kill %1)",
+      "Bash(echo \"exit: $?\")"
+    ],
+    "additionalDirectories": [
+      "d:\\Github\\ISO_System\\ISO"
     ]
   }
 }
